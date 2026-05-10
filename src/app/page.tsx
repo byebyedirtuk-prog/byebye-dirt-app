@@ -3,7 +3,7 @@
 import { useAuth } from "@/hooks/useAuth";
 
 export default function HomePage() {
-  const { logout, profile, user } = useAuth();
+  const { authError, logout, profile, user } = useAuth();
 
   return (
     <main className="home-shell">
@@ -37,6 +37,7 @@ export default function HomePage() {
       </section>
 
       <section className="action-section">
+        {authError && <p className="error-text">{authError}</p>}
         <a className="text-link" href="/admin-only">
           Open admin-only example
         </a>

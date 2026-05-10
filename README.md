@@ -14,7 +14,7 @@ Use `docs/ByeByeDirt_App_Specification_for_Codex.md`.
 ## Setup
 
 1. Run `npm install`.
-2. Run `npm run dev`.
-3. Open `http://localhost:3000`.
+2. Run `npm run dev -- -p 3001`.
+3. Open `http://localhost:3001`.
 
-Firebase is intentionally not configured in this setup phase.
+Firebase Auth and Firestore user roles are configured for the current phase.

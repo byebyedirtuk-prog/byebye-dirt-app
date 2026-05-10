@@ -14,8 +14,7 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import type { AppUserProfile } from "@/lib/auth";
 
 type AuthContextValue = {
@@ -23,22 +22,31 @@ type AuthContextValue = {
   profile: AppUserProfile | null;
   loading: boolean;
   profileLoading: boolean;
+  authError: string;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+type BootstrapResponse = {
+  profile?: AppUserProfile;
+  error?: string;
+  detail?: string;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AppUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       setLoading(false);
+      setAuthError("");
 
       if (!nextUser) {
         setProfile(null);
@@ -49,37 +57,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfileLoading(true);
 
       try {
-        const profileRef = doc(db, "users", nextUser.uid);
-        const profileSnapshot = await getDoc(profileRef);
+        console.info("[auth] Starting profile bootstrap.");
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+        const token = await nextUser.getIdToken();
+        const response = await fetch("/api/auth/bootstrap", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
 
-        if (!profileSnapshot.exists()) {
-          const email = nextUser.email ?? "";
-          const newProfile = {
-            uid: nextUser.uid,
-            email,
-            fullName: nextUser.displayName ?? "não especificado",
-            role: "cleaner",
-            onboardingCompleted: false,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          };
+        window.clearTimeout(timeoutId);
+        const data = (await response.json()) as BootstrapResponse;
 
-          await setDoc(profileRef, newProfile);
-        } else {
-          await setDoc(
-            profileRef,
-            {
-              email: nextUser.email ?? profileSnapshot.data().email ?? "",
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
+        if (!response.ok) {
+          throw new Error(
+            [data.error, data.detail].filter(Boolean).join(" ") ||
+              "Could not create or load your user profile.",
           );
         }
 
-        const refreshedProfileSnapshot = await getDoc(profileRef);
-        setProfile(refreshedProfileSnapshot.data() as AppUserProfile);
+        if (!data.profile) {
+          throw new Error("Bootstrap response did not include a user profile.");
+        }
+
+        console.info("[auth] Profile bootstrap complete.", {
+          uid: data.profile.uid,
+          role: data.profile.role,
+        });
+
+        setProfile(data.profile);
       } catch (error) {
         console.error("Could not load user profile.", error);
+        setAuthError(
+          error instanceof DOMException && error.name === "AbortError"
+            ? "The user profile request timed out. Please refresh and try again."
+            : error instanceof Error
+              ? error.message
+              : "Could not create or load your user profile. Please check Firebase Admin settings and Firestore access.",
+        );
         setProfile(null);
       } finally {
         setProfileLoading(false);
@@ -103,10 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       profileLoading,
+      authError,
       login,
       logout,
     }),
-    [loading, login, logout, profile, profileLoading, user],
+    [authError, loading, login, logout, profile, profileLoading, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

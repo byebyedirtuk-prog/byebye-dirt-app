@@ -1,5 +1,3 @@
-import type { Timestamp } from "firebase/firestore";
-
 export type UserRole = "admin" | "cleaner";
 
 export type AppUserProfile = {
@@ -8,6 +6,6 @@ export type AppUserProfile = {
   fullName: string;
   role: UserRole;
   onboardingCompleted: boolean;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: string | null;
+  updatedAt: string | null;
 };

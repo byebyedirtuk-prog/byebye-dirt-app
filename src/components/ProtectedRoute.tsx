@@ -5,11 +5,11 @@ import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { loading, profileLoading, user } = useAuth();
+  const { authError, loading, profileLoading, user } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === "/login";
-  const isCheckingAccess = loading || profileLoading;
+  const isCheckingAccess = loading || (!isLoginPage && user && profileLoading);
 
   useEffect(() => {
     if (!isCheckingAccess && !user && !isLoginPage) {
@@ -24,7 +24,10 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   if (isCheckingAccess) {
     return (
       <main className="center-screen">
-        <p className="muted-text">Checking session...</p>
+        <div className="simple-panel">
+          <p className="muted-text">Checking session...</p>
+          {authError && <p className="error-text">{authError}</p>}
+        </div>
       </main>
     );
   }
