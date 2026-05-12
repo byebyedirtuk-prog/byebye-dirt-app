@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Bye Bye Dirt Cleaning",
-  description: "Operations management for Bye Bye Dirt Cleaning"
+  description: "Operational workspace for Bye Bye Dirt Cleaning"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

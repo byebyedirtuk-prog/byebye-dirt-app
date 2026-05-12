@@ -2,15 +2,10 @@ import type { NextConfig } from "next";
 import path from "node:path";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.NODE_ENV === "production" ? ".next-build" : ".next",
   reactStrictMode: true,
-  outputFileTracingRoot: path.join(__dirname),
-  webpack(config) {
-    config.watchOptions = {
-      ...config.watchOptions,
-      ignored: ["**/.git/**", "**/.next/**", "**/.npm-cache/**", "**/node_modules/**"],
-    };
-
-    return config;
+  turbopack: {
+    root: path.join(__dirname),
   },
 };
 

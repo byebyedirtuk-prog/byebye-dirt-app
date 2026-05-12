@@ -35,6 +35,31 @@ type BootstrapResponse = {
   detail?: string;
 };
 
+class AuthTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthTimeoutError";
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new AuthTimeoutError(message));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AppUserProfile | null>(null);
@@ -43,7 +68,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState("");
 
   useEffect(() => {
+    const authStateTimeoutId = window.setTimeout(() => {
+      console.error("[auth] Firebase auth state did not resolve before timeout.");
+      setAuthError("Firebase authentication did not finish loading. Please refresh and try again.");
+      setLoading(false);
+      setProfileLoading(false);
+    }, 12000);
+
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      window.clearTimeout(authStateTimeoutId);
+      console.info("[auth] Auth state resolved.", {
+        signedIn: Boolean(nextUser),
+      });
       setUser(nextUser);
       setLoading(false);
       setAuthError("");
@@ -59,17 +95,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         console.info("[auth] Starting profile bootstrap.");
         const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 12000);
-        const token = await nextUser.getIdToken();
-        const response = await fetch("/api/auth/bootstrap", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          signal: controller.signal,
-        });
+        const token = await withTimeout(
+          nextUser.getIdToken(),
+          10000,
+          "Firebase ID token request timed out.",
+        );
+        const response = await withTimeout(
+          fetch("/api/auth/bootstrap", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          }),
+          12000,
+          "The user profile request timed out.",
+        );
 
-        window.clearTimeout(timeoutId);
         const data = (await response.json()) as BootstrapResponse;
 
         if (!response.ok) {
@@ -91,6 +133,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(data.profile);
       } catch (error) {
         console.error("Could not load user profile.", error);
+        if (error instanceof AuthTimeoutError) {
+          setAuthError(error.message);
+          setProfile(null);
+          return;
+        }
+
         setAuthError(
           error instanceof DOMException && error.name === "AbortError"
             ? "The user profile request timed out. Please refresh and try again."
@@ -104,7 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      window.clearTimeout(authStateTimeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
