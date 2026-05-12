@@ -174,7 +174,75 @@ export function ClientsAdminPage() {
       </div>
 
       <div className="clients-grid">
-        <form className="admin-form-panel" onSubmit={handleSubmit}>
+        <div className="admin-list-panel clients-list-panel">
+          <div className="admin-list-heading clients-list-heading">
+            <div>
+              <h3>Active clients</h3>
+              <p>Primary client directory for Phase 1 records.</p>
+            </div>
+            <span>{activeClients.length}</span>
+          </div>
+
+          <div className="clients-summary" aria-label="Client record totals">
+            <span>
+              <strong>{activeClients.length}</strong>
+              Active
+            </span>
+            <span>
+              <strong>{inactiveClients.length}</strong>
+              Inactive
+            </span>
+          </div>
+
+          {loading ? (
+            <p className="muted-text">Loading clients...</p>
+          ) : activeClients.length === 0 ? (
+            <div className="empty-state">
+              <h4>No active clients yet</h4>
+              <p className="muted-text">Create a client record to start building the operations base.</p>
+            </div>
+          ) : (
+            <div className="client-list">
+              {activeClients.map((client) => (
+                <article className="client-row" key={client.id}>
+                  <div>
+                    <h4>{client.name}</h4>
+                    <p>
+                      {clientTypeOptions.find((option) => option.value === client.clientType)
+                        ?.label ?? client.clientType}
+                    </p>
+                    <small>
+                      {client.email ?? "No email"} · {client.phone ?? "No phone"} · Created{" "}
+                      {formatDate(client.createdAt)}
+                    </small>
+                  </div>
+
+                  <div className="client-row-actions">
+                    <button type="button" className="secondary-button" onClick={() => startEditing(client)}>
+                      Edit
+                    </button>
+                    <button type="button" className="danger-button" onClick={() => deactivateClient(client)}>
+                      Deactivate
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {inactiveClients.length > 0 && (
+            <div className="inactive-clients">
+              <h3>Inactive clients</h3>
+              {inactiveClients.map((client) => (
+                <p key={client.id}>
+                  {client.name} <span>{client.id}</span>
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <form className="admin-form-panel clients-form-panel" onSubmit={handleSubmit}>
           <div>
             <p className="admin-kicker">{editingClientId ? "Edit client" : "New client"}</p>
             <h3>{editingClientId ? form.name : "Create client"}</h3>
@@ -242,57 +310,6 @@ export function ClientsAdminPage() {
             )}
           </div>
         </form>
-
-        <div className="admin-list-panel">
-          <div className="admin-list-heading">
-            <h3>Active clients</h3>
-            <span>{activeClients.length}</span>
-          </div>
-
-          {loading ? (
-            <p className="muted-text">Loading clients...</p>
-          ) : activeClients.length === 0 ? (
-            <p className="muted-text">No active clients yet.</p>
-          ) : (
-            <div className="client-list">
-              {activeClients.map((client) => (
-                <article className="client-row" key={client.id}>
-                  <div>
-                    <h4>{client.name}</h4>
-                    <p>
-                      {clientTypeOptions.find((option) => option.value === client.clientType)
-                        ?.label ?? client.clientType}
-                    </p>
-                    <small>
-                      {client.email ?? "No email"} · {client.phone ?? "No phone"} · Created{" "}
-                      {formatDate(client.createdAt)}
-                    </small>
-                  </div>
-
-                  <div className="client-row-actions">
-                    <button type="button" className="secondary-button" onClick={() => startEditing(client)}>
-                      Edit
-                    </button>
-                    <button type="button" className="danger-button" onClick={() => deactivateClient(client)}>
-                      Deactivate
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-
-          {inactiveClients.length > 0 && (
-            <div className="inactive-clients">
-              <h3>Inactive clients</h3>
-              {inactiveClients.map((client) => (
-                <p key={client.id}>
-                  {client.name} <span>{client.id}</span>
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </section>
   );
